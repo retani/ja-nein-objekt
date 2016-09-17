@@ -1,29 +1,47 @@
+///////// CONFIG
+
+//var master_network_address = "192.168.5.1"
+var master_network_address = "192.168.0.3"
+
+var amp_factor = 2;
+
+
 ///////// INIT
 
 var _ = require('underscore-node');
+var wpi = require('wiring-pi');
 
+var now_speaking = false
+
+status = {}
 
 //////// SPEAK
 
 var exec = require('child_process').exec;
 
 speak = function(text, options) {
+  if (now_speaking) return
+  now_speaking = true
   params = []
   if (options == null) options = {}
   if (options.voice) { params.push("-v " + options.voice) }
-  if (options.speed) { params.push("-s " + options.speed) }
-  if (options.pitch) { params.push("-p " + options.pitch) }
-  if (options.amplitude) { params.push("-a " + options.amplitude) }
+  if (options.speed) { params.push("-s " + Math.floor(options.speed)) }
+  if (options.pitch) { params.push("-p " + Math.floor(options.pitch)) }
+  if (options.amplitude) options.amplitude = options.amplitude * amp_factor
+  else options.amplitude = 100 * amp_factor
+  if (options.amplitude) { params.push("-a " + Math.floor(options.amplitude)) }
   var cmd = 'espeak ' +  params.join(" ") + ' ' + '"' + text + '"'
+  status.lastUtterance = wpi.millis()
+  if (logSpeakDDP) logSpeakDDP([text, options])
+  console.log(cmd)
   exec(cmd, function(error, stdout, stderr) {
+    now_speaking = false
   });  
 }
 
-speak("ok")
+speak("I am here.", {amplitude: 50})
 
 //////// SENSOR
-
-var wpi = require('wiring-pi');
 
 wpi.setup('gpio');
 
@@ -68,9 +86,11 @@ measure = function(sensor, callback) {
   var delta = StopZeit - StartZeit
   var distance =  Math.round(( delta * 34300 / 2 ) / 1000000)
 
-  wpi.delay(1)
+  wpi.delay(3)
 
   //console.log("sensor " + sensor.id + " measured " + distance + "cm")
+
+  if (callback) callback()
   return distance
 }
 
@@ -140,9 +160,6 @@ doMeasureAtOnce = function(sensor, callback) {
 
 var DDPClient = require("ddp");
 
-//var master_network_address = "192.168.5.1"
-var master_network_address = "192.168.178.25"
-
 var ddpclient = new DDPClient({
   // All properties optional, defaults shown
   host : master_network_address,
@@ -185,6 +202,28 @@ var logMeasuresDDP = function () {
   }  
 }
 
+var logSpeakDDP = function (data) {
+  /*
+   * Call a Meteor Method
+   */
+  if (!ddpclient) return
+  try {
+    ddpclient.call(
+      'logSpeak',             // name of Meteor Method being called
+      data,            // parameters to send to Meteor Method
+      function (err, result) {   // callback which returns the method call results
+        //console.log('called function, result: ' + result);
+      },
+      function () {              // callback which fires when server has finished
+        //console.log('updated');  // sending any updated documents as a result of
+      }
+    );
+  }
+  catch(err) {
+      
+  }  
+}
+
 
 console.log('DDP init');
 
@@ -206,12 +245,11 @@ ddpclient.connect(function(error, wasReconnect) {
 
 ////////////// ACTION
 
-status = {}
-
 analyze = function() {
   var values = _.values(measures)
   var min = _.min(values)
-  if (min < 65 && min > 10) {
+  //if (min < 65 && min > 10) {
+  if ( _.filter(values, function(v){ return (v > 12 && v < 90) }).length > 0 ) {
     var current = "danger"
   }
   else {
@@ -225,15 +263,110 @@ analyze = function() {
 }
 
 act = function() {
-  if (status.before != status.now || status.now == "danger" && (wpi.millis()-status.lastChange > 3000) ) {
-    if (status.now == "danger") {
-      speak("No")
+  if (status.before != status.now ) {
+    if (status.now == "danger") { // moving close
+      if (r(1,16) == 1) {
+        speak("keep the distance. ", { amplitude: 50, speed: 50, pitch: r(40,120) })  
+      }
+      else {
+        speak("No ".repeat(r(1,4)) + ".")
+      }
+    }
+    else { // moving away
+      if (r(1,4) == 1) speak("Yes")
+    }
+  }
+  else if (status.now == "danger" && (wpi.millis()-status.lastChange > 3000) && (wpi.millis()-status.lastUtterance > 1000)) { // stay close
+    speak((var_nope()+" ").repeat(r(0,2)))
+  }
+  else if (status.now == "ok" && wpi.millis()-status.lastUtterance >1000 && Math.random() < 0.2) {
+    var options = {}
+    options.pitch = 20 + (Math.random() * 60)
+    options.speed = 40 + (Math.random() * 40)
+    options.amplitude = r(20,100)
+
+    if (r(1,6) == 1) {
+      speak( (r(1,5) == 1 ? "Come closer " : "Please"), { amplitude: 50, speed: 30 })  
     }
     else {
-      speak("Yes")
+      speak("Yes", options)
     }
   }
 }
+
+var last_beuys = 0
+act_beuys = function() {
+  amp_factor = 1
+  if (status.before != status.now || wpi.millis()-status.lastUtterance > 100000) {
+    if (status.now == "danger" || (Math.random() + last_beuys) < 0.5 ) { // moving close
+      speak("Ja" + var_punctuation() + " ja ja ja.", {
+        voice: "mb/mb-de"+r(3,6), 
+        //voice: "de",
+        speed: r(40,100),
+        //speed: r(60,120),
+        //pitch: r(80,120),
+        pitch: r(20,60),
+      })
+      last_beuys = 1
+    }
+    else { // moving away
+      speak("Nein!" + " Nein".repeat(r(3,5)) + ".", {
+        voice: "mb/mb-de"+r(3,5), 
+        //voice: "de",
+        speed: r(40,100),
+        //speed: r(60,120),
+        //pitch: r(80,120),
+        pitch: r(20,60),
+      })
+      last_beuys = 0
+    }
+  }
+}
+
+act_positive = function() {
+  if (status.before != status.now || wpi.millis()-status.lastUtterance > 2000) {
+    if (status.now == "danger" || (Math.random() + last_beuys) < 0.5 ) { // moving close
+      var str = "you are "
+      switch (r(1,4)) {
+        case 1: str += "awesome"
+          break;
+        case 2: str += "fantastic"
+          break;
+        case 3: str += "great"
+          break;
+      }
+      speak(str)
+    }
+  }
+  else if (status.now == "danger") {
+    if (r(1,5) == 1) {
+      speak("I love you")
+    }
+  }
+}
+
+
+r = function(min, max) {
+  return Math.floor(Math.random() * (max-min) + min)
+}
+
+r_choice = function(a) {
+  return _.sample(a)
+}
+
+String.prototype.repeat = function( num )
+{
+    return new Array( num + 1 ).join( this );
+}
+
+var_nope = function() {
+  return _.sample(["No", "no?", "Nope", "No way", "No thanks."])
+}
+
+var_punctuation = function() {
+  return _.sample([".", ",", " ", "?", "..."])
+}
+
 
 //////////////// MAIN LOOP
 
@@ -243,5 +376,7 @@ setInterval ( function() {
   logMeasuresDDP(measures)
   analyze()
   act()
-  console.log(status)
-}, 500)
+  //act_beuys()
+  //act_positive()
+  //console.log(status)
+}, 550)
