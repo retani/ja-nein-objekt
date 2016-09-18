@@ -1,0 +1,31 @@
+<head>
+  <title>yesno</title>
+</head>
+
+<body>
+  <h1></h1>
+  {{> hello}}
+</body>
+
+<template name="hello">
+  <p>
+    Last: {{time}}
+  </p>
+  <p>
+    Number: {{number}}
+  </p>
+  <ul>
+  {{#each values}}
+    <li>
+     {{this}}
+   </li>
+  {{/each}}
+  </ul>
+
+  {{#each values}}
+    <div class="balken" style="width:{{this}}px; height:20px; background-color:red;margin-bottom:1px">
+      {{@index}}: {{this}}
+    </div>
+  {{/each}}
+
+</template>

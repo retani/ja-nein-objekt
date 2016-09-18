@@ -1,0 +1,1 @@
+Measures = new Mongo.Collection('Measures');
