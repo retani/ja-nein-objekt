@@ -1,7 +1,8 @@
 ///////// CONFIG
 
 //var master_network_address = "192.168.5.1"
-var master_network_address = "192.168.0.3"
+//var master_network_address = "192.168.0.3"
+var master_network_address = "192.168.178.25"
 
 var amp_factor = 2;
 
