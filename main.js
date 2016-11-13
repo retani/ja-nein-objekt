@@ -3,8 +3,9 @@
 //var master_network_address = "192.168.5.1"
 //var master_network_address = "192.168.0.3"
 var master_network_address = "192.168.178.25"
+//var master_network_address = "192.168.178.134"
 
-var amp_factor = 2;
+var amp_factor = 0.3;// max: 2 (?)
 
 
 ///////// INIT
@@ -16,12 +17,14 @@ var now_speaking = false
 
 status = {}
 
+var processes = []
+
 //////// SPEAK
 
 var exec = require('child_process').exec;
 
 speak = function(text, options) {
-  if (now_speaking) return
+  if (now_speaking && ( !options || !options.always) ) { console.log ("speech collision"); return }
   now_speaking = true
   params = []
   if (options == null) options = {}
@@ -35,9 +38,11 @@ speak = function(text, options) {
   status.lastUtterance = wpi.millis()
   if (logSpeakDDP) logSpeakDDP([text, options])
   console.log(cmd)
-  exec(cmd, function(error, stdout, stderr) {
+  var process = exec(cmd, function(error, stdout, stderr) {
+    processes.pop() // does not necessarily remove the same process that started it
     now_speaking = false
-  });  
+  });
+  processes.push(process)
 }
 
 speak("I am here.", {amplitude: 50})
@@ -250,7 +255,7 @@ analyze = function() {
   var values = _.values(measures)
   var min = _.min(values)
   //if (min < 65 && min > 10) {
-  if ( _.filter(values, function(v){ return (v > 12 && v < 90) }).length > 0 ) {
+  if ( _.filter(values, function(v){ return (v > 12 && v < 80) }).length > 0 ) {
     var current = "danger"
   }
   else {
@@ -266,11 +271,12 @@ analyze = function() {
 act = function() {
   if (status.before != status.now ) {
     if (status.now == "danger") { // moving close
+      console.log("intrusion")
       if (r(1,16) == 1) {
-        speak("keep the distance. ", { amplitude: 50, speed: 50, pitch: r(40,120) })  
+        speak("keep the distance. ", { amplitude: 50, speed: 50, pitch: r(40,120), always: true })  
       }
       else {
-        speak("No ".repeat(r(1,4)) + ".")
+        speak("No ".repeat(r(1,4)) + ".", { always: true })
       }
     }
     else { // moving away
@@ -380,4 +386,4 @@ setInterval ( function() {
   //act_beuys()
   //act_positive()
   //console.log(status)
-}, 550)
+}, 350)
