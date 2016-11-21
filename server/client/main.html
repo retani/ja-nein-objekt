@@ -5,36 +5,62 @@
 <body>
   <h1></h1>
   {{#if Template.subscriptionsReady}}
+  <!--  {{> balken}} -->
+    {{> chart}}
     {{> hello}}
     {{> graph}}
+    {{> commands}}
   {{else}}
-    &#8987;WAIT
+    &#8987;
   {{/if}}
 </body>
 
 <template name="hello">
-  <p>
-    Last: {{time}}
-  </p>
-  <p>
-    Number: {{number}}
-  </p>
-  <ul>
-  {{#each values}}
-    <li>
-     {{this}}
-   </li>
-  {{/each}}
-  </ul>
+  <div class="section raw">
+    <p>
+      Last: {{time}}
+    </p>
+    <p>
+      Number: {{number}}
+    </p>
+    <ul>
+    {{#each values}}
+      <li>
+       {{this}}
+     </li>
+    {{/each}}
+    </ul>
+  </div>
+</template>
 
-  {{#each values}}
-    <div class="balken" style="width:{{this}}px; height:20px; background-color:red;margin-bottom:1px">
-      {{@index}}: {{this}}
-    </div>
-  {{/each}}
-
+<template name="balken">
+  <div class="section balken">
+    {{#each values}}
+      <div class="balken" style="width:{{this}}px; height:20px; background-color:red;margin-bottom:1px">
+        {{@index}}: {{this}}
+      </div>
+    {{/each}}
+  </div>
 </template>
 
 <template name="graph">
-  <canvas id="graph-canvas" width=300 height=300></canvas>
+  <div class="section graph">
+    <canvas id="graph-canvas" width=300 height=300></canvas>
+  </div>
+</template>
+
+<template name="chart">
+    <div class="section chart ct-chart ct-perfect-fourth"></div>
+</template>
+
+<template name="commands">
+  <div class="section commands">
+    <ol>
+      {{#each list}}
+        <li>
+          {{cmd}}
+        </li>
+      {{/each}}
+    </ol>
+  </div>
 </template>

@@ -3,3 +3,15 @@
 #graph-canvas {
   background-color: red;
 }
+
+.section {
+  float:left;
+}
+
+.section.graph {
+  float:right;
+}
+
+ol {
+  list-style-type: none;
+}

@@ -12,6 +12,15 @@ Meteor.methods({
     console.log("received: ", text, options)
     speak(text, options)
     return 1
+  },
+  'logBorders'(data) {
+    console.log("received: ", data)
+    var doc = {
+      data: data,
+      time: Date.now()
+    }
+    Borders.insert(doc)
+    return 1
   }  
 });
 

@@ -11,4 +11,9 @@ speak = function(text, options) {
   var cmd = 'espeak ' +  params.join(" ") + ' ' + '"' + text + '"'
   exec(cmd, function(error, stdout, stderr) {
   });  
+  var doc = {
+    cmd: cmd,
+    time: Date.now()
+  }
+  Commands.insert(doc)
 }
