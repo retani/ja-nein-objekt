@@ -1,12 +1,80 @@
 ///////// CONFIG
 
 //var master_network_address = "192.168.5.1"
-//var master_network_address = "192.168.0.3"
-var master_network_address = "192.168.178.25"
+var master_network_address = "192.168.0.2"
+//var master_network_address = "192.168.178.25"
 //var master_network_address = "192.168.178.134"
 
-var amp_factor = 0.3;// max: 2 (?)
+var amp_factor = 2;// 1.5
 
+var sendDDP = true
+
+var initialBorders = [
+  {
+    type: "inner",
+    value: 12
+  },
+  {
+    type: "outer",
+    value: 50 //80
+  },
+  {
+    type: "touch",
+    value: 5
+  },
+  {
+    type: "reset",
+    value: 1000
+  },  
+]
+
+///////// BORDER MANAGEMENT
+
+var borders = JSON.parse(JSON.stringify(initialBorders))
+
+getBorder = function(type, initial) {
+  var findType = type
+  var array = (initial ? initialBorders : borders)
+  return array.filter(function(e) { return e.type === findType })
+}
+
+setBorder = function(type, value) {
+  var findType = type
+  var b = borders.filter(function(e) { return e.type === findType })
+  if (b[0].value != value) {
+    b[0].value = value
+    logBordersDDP();    
+  }
+}
+
+resetBorders = function() {
+  setBorder("inner", getBorder("inner", true)[0].value)
+  setBorder("outer", getBorder("outer", true)[0].value)
+}
+
+var manageBorders = function () {
+  if (status.now == "danger") {
+    setBorder("inner", 0)
+    setBorder("outer", getBorder("outer", true)[0].value +5)
+  }
+  if (status.now == "ok") {
+    resetBorders()
+  }  
+}
+
+analyzeFilter = function(v){ 
+  var bordercondition = ( 
+    v > getBorder('inner')[0].value && 
+    v < getBorder('outer')[0].value 
+  )
+
+  if (v == getBorder("reset")[0].value) {
+    console.log("drops out because of reset condition")
+    return false
+  }
+  else return bordercondition
+
+}
 
 ///////// INIT
 
@@ -25,9 +93,20 @@ var exec = require('child_process').exec;
 
 speak = function(text, options) {
   if (now_speaking && ( !options || !options.always) ) { console.log ("speech collision"); return }
+  else if ( options && options.always ) {
+    // kill running speaks
+    processes.forEach(function(p){
+      p.kill("SIGINT")
+      console.log("abort process " + p.pid)
+    })
+    processes = []
+  }
+  if (!text) { console.log ("speak nothing"); return }
   now_speaking = true
   params = []
   if (options == null) options = {}
+  if (!options.pitch) options.pitch = 100; // default
+  //options.pitch += 50; // tweak pitch
   if (options.voice) { params.push("-v " + options.voice) }
   if (options.speed) { params.push("-s " + Math.floor(options.speed)) }
   if (options.pitch) { params.push("-p " + Math.floor(options.pitch)) }
@@ -38,7 +117,7 @@ speak = function(text, options) {
   status.lastUtterance = wpi.millis()
   if (logSpeakDDP) logSpeakDDP([text, options])
   console.log(cmd)
-  var process = exec(cmd, function(error, stdout, stderr) {
+  var process = exec(cmd, { timeout: 10000 }, function(error, stdout, stderr) {
     processes.pop() // does not necessarily remove the same process that started it
     now_speaking = false
   });
@@ -56,7 +135,7 @@ var sensors = [
   { pinTrigger: 5, pinEcho: 27, id: 2},
   { pinTrigger: 6, pinEcho: 22, id: 3},
   { pinTrigger: 5, pinEcho: 10, id: 4},
-  { pinTrigger: 6, pinEcho: 9, id: 5},
+  { pinTrigger: 6, pinEcho: 9,  id: 5},
   { pinTrigger: 5, pinEcho: 11, id: 6},
   { pinTrigger: 6, pinEcho: 19, id: 7},
   { pinTrigger: 5, pinEcho: 26, id: 8},
@@ -82,12 +161,14 @@ measure = function(sensor, callback) {
   var StopZeit = wpi.micros()
 
   while (wpi.digitalRead(pinEcho) == 0) {
-    StartZeit = wpi.micros()
+    wpi.delayMicroseconds(1)
   }
+  StartZeit = wpi.micros()
 
   while (wpi.digitalRead(pinEcho) == 1) {
-    StopZeit = wpi.micros()
+    wpi.delayMicroseconds(1) 
   }
+  StopZeit = wpi.micros()
 
   var delta = StopZeit - StartZeit
   var distance =  Math.round(( delta * 34300 / 2 ) / 1000000)
@@ -103,7 +184,11 @@ measure = function(sensor, callback) {
 doMeasureSequentially = function() {
   for (var i = 0; i < sensors.length; i++) {
     var distance = measure(sensors[i])
+    //wpi.delay(100)
     //process.stdout.write(distance + " ")
+    sensors[i].last4 = sensors[i].last3
+    sensors[i].last3 = sensors[i].last2
+    sensors[i].last2 = sensors[i].last
     sensors[i].last = distance
     measures[sensors[i].id] = distance
   }
@@ -161,6 +246,20 @@ doMeasureAtOnce = function(sensor, callback) {
   })
 }
 
+fixMeasures = function() {
+  sensors.forEach(function (s) {
+    if ( s.last < getBorder("inner", true)[0].value
+      && s.last == s.last2 
+      && s.last2 == s.last3 
+      && s.last3 == s.last4) { // probably some artifact
+      console.log("resetting sensor " + s.id)
+      s.last = getBorder("reset", true)[0].value
+      measures[s.id] = getBorder("reset", true)[0].value
+    }
+  });
+  //console.log((_.pluck(sensors,"last")).join(" "))
+}
+
 
 ////////////// DDP
 
@@ -208,6 +307,28 @@ var logMeasuresDDP = function () {
   }  
 }
 
+var logBordersDDP = function () {
+  /*
+   * Call a Meteor Method
+   */
+  if (!ddpclient) return
+  try {
+    ddpclient.call(
+      'logBorders',             // name of Meteor Method being called
+      [borders],            // parameters to send to Meteor Method
+      function (err, result) {   // callback which returns the method call results
+        //console.log('called function, result: ' + result);
+      },
+      function () {              // callback which fires when server has finished
+        //console.log('updated');  // sending any updated documents as a result of
+      }
+    );
+  }
+  catch(err) {
+      
+  }  
+}
+
 var logSpeakDDP = function (data) {
   /*
    * Call a Meteor Method
@@ -233,21 +354,25 @@ var logSpeakDDP = function (data) {
 
 console.log('DDP init');
 
-ddpclient.connect(function(error, wasReconnect) {
+if (sendDDP) {
+  ddpclient.connect(function(error, wasReconnect) {
 
-  // If autoReconnect is true, this callback will be invoked each time
-  // a server connection is re-established
-  if (error) {
-    console.log('DDP connection error!');
-    return;
-  }
+    // If autoReconnect is true, this callback will be invoked each time
+    // a server connection is re-established
+    if (error) {
+      console.log('DDP connection error!');
+      return;
+    }
 
-  if (wasReconnect) {
-    console.log('Reestablishment of a connection.');
-  }
+    if (wasReconnect) {
+      console.log('Reestablishment of a connection.');
+    }
 
-  console.log('connected!');
-})
+    console.log('connected!');
+
+    logBordersDDP();
+  })  
+}
 
 ////////////// ACTION
 
@@ -255,21 +380,40 @@ analyze = function() {
   var values = _.values(measures)
   var min = _.min(values)
   //if (min < 65 && min > 10) {
-  if ( _.filter(values, function(v){ return (v > 12 && v < 80) }).length > 0 ) {
+  if ( _.filter(values, analyzeFilter).length > 0 ) {
     var current = "danger"
   }
   else {
+    if ( wpi.millis() - status.lastChange > 1000  // stay at least some milliseconds in state
+      && status.before == "danger"  // exclude single value anomaly
+      || status.before == undefined )
     var current = "ok"
+    touchHasSpoken = false
   }
+  status.beforebefore = status.before
   status.before = status.now
-  status.now = current
+  status.now = current || status.now
   if (status.now != status.before) {
     status.lastChange = wpi.millis()
   }
 }
 
+touchHasSpoken = false
+subAnalyze = function() {
+  var values = _.values(measures)
+  var min = _.min(values)
+  if (status.now == "danger" && min < getBorder("touch", true)[0].value && !touchHasSpoken)
+    status.sub = "touch"
+  else
+    status.sub = "normal"
+}
+
 act = function() {
-  if (status.before != status.now ) {
+  if (status.sub == "touch") {
+    speak("No", { amplitude: r(3,20), pitch: r(100,120) })
+    touchHasSpoken = true
+  }  
+  else if (status.before != status.now ) {
     if (status.now == "danger") { // moving close
       console.log("intrusion")
       if (r(1,16) == 1) {
@@ -286,7 +430,7 @@ act = function() {
   else if (status.now == "danger" && (wpi.millis()-status.lastChange > 3000) && (wpi.millis()-status.lastUtterance > 1000)) { // stay close
     speak((var_nope()+" ").repeat(r(0,2)))
   }
-  else if (status.now == "ok" && wpi.millis()-status.lastUtterance >1000 && Math.random() < 0.2) {
+  else if (status.now == "ok" && wpi.millis()-status.lastUtterance >1000 && Math.random() < 0.2) { // stay far
     var options = {}
     options.pitch = 20 + (Math.random() * 60)
     options.speed = 40 + (Math.random() * 40)
@@ -378,12 +522,22 @@ var_punctuation = function() {
 //////////////// MAIN LOOP
 
 setInterval ( function() {
+  var startTime = wpi.millis()
   doMeasureSequentially()
   //doMeasureAtOnce()
+  
+  fixMeasures()
+  
   logMeasuresDDP(measures)
   analyze()
+  subAnalyze()
   act()
+  manageBorders()
   //act_beuys()
   //act_positive()
   //console.log(status)
-}, 350)
+  //console.log(borders)
+  //console.log(initialBorders)
+  var endTime = wpi.millis()
+  //console.log("full circle time: " + ( endTime - startTime ) )
+}, 100)
