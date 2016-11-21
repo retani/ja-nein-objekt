@@ -1,5 +1,15 @@
+Raspberry
+---------
+
 sudo systemctl start  nodeserver.service
 sudo systemctl stop   nodeserver.service
 sudo systemctl status nodeserver.service
 sudo systemctl restart  nodeserver.service
 tail -f /var/log/syslog
+
+hellerau
+
+Server
+------
+
+sshfs pi@192.168.178.183: pi
