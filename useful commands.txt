@@ -1,13 +1,13 @@
 Raspberry
 ---------
 
+sudo ln nodeserver.service /etc/systemd/system/nodeserver.service
+systemctl enable nodeserver.service
+
 sudo systemctl start  nodeserver.service
 sudo systemctl stop   nodeserver.service
 sudo systemctl status nodeserver.service
-sudo systemctl restart  nodeserver.service
-tail -f /var/log/syslog
-
-hellerau
+sudo systemctl restart  nodeserver.service; tail -f /var/log/syslog
 
 Server
 ------

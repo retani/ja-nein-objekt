@@ -1,3 +1,0 @@
-#!/bin/bash
-mkdir pi
-sshfs pi@192.168.178.183: pi
