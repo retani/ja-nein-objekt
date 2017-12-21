@@ -5,7 +5,7 @@
 <body>
   <h1></h1>
   {{#if Template.subscriptionsReady}}
-  <!--  {{> balken}} -->
+    <!-- {{> balken}} -->
     {{> chart}}
     {{> hello}}
     {{> graph}}
@@ -23,7 +23,7 @@
     <p>
       Number: {{number}}
     </p>
-    <ul>
+    <ul class="sensors-list">
     {{#each values}}
       <li>
        {{this}}

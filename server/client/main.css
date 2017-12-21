@@ -15,3 +15,43 @@
 ol {
   list-style-type: none;
 }
+
+.ct-series-a .ct-line, .sensors-list li:nth-child(1) {
+	color:darkred;
+	stroke:darkred;
+}
+
+.ct-series-b .ct-line, .sensors-list li:nth-child(2) {
+	color:orange;
+	stroke:orange;
+}
+
+.ct-series-c .ct-line, .sensors-list li:nth-child(3) {
+	color:yellowgreen;
+	stroke:yellowgreen;
+}
+
+.ct-series-d .ct-line, .sensors-list li:nth-child(4) {
+	color:green;
+	stroke:green;
+}
+
+.ct-series-e .ct-line, .sensors-list li:nth-child(5) {
+	color:lightseagreen;
+	stroke:lightseagreen;
+}
+
+.ct-series-f .ct-line, .sensors-list li:nth-child(6) {
+	color:blue;
+	stroke:blue;
+}
+
+.ct-series-g .ct-line, .sensors-list li:nth-child(7) {
+	color:violet;
+	stroke:violet;
+}
+
+.ct-series-h .ct-line, .sensors-list li:nth-child(8) {
+	color:black;
+	stroke:black;
+}
