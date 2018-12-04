@@ -1,5 +1,7 @@
 var exec = require('child_process').exec;
 
+speak_delay = 160;
+
 speak = function(text, options) {
   console.log("trying speak")
   params = []
@@ -9,8 +11,9 @@ speak = function(text, options) {
   if (options.pitch) { params.push("-p " + options.pitch) }
   if (options.amplitude) { params.push("-a " + options.amplitude) }
   var cmd = 'espeak ' +  params.join(" ") + ' ' + '"' + text + '"'
-  exec(cmd, function(error, stdout, stderr) {
-  });  
+  Meteor.setTimeout(function(){
+    exec(cmd, function(error, stdout, stderr) {});  
+  },speak_delay)
   var doc = {
     cmd: cmd,
     time: Date.now()
